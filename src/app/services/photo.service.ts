@@ -6,14 +6,14 @@ import {
   CameraResultType,
   Capacitor,
   CameraPhoto
-} from '@capacitor/core'
+} from '@capacitor/core';
 import { Platform } from '@ionic/angular';
 
 const { Camera, Filesystem, Storage } = Plugins;
 
 export interface Photo {
-  filePath: string,
-  webViewPath: string
+  filePath: string;
+  webViewPath: string;
 }
 
 @Injectable({
@@ -39,20 +39,21 @@ export class PhotoService {
     this.photo = JSON.parse(photoList.value) || [];
 
     // La forma más fácil de detectar cuando se ejecuta en la web:
-   // "cuando la plataforma NO sea híbrida, haz esto"
-   if(!this.platform.is('hybrid')){
-     // Muestra la foto leyendo en formato base64
-     for (let photo of this.photo) {
-      // Leer los datos de cada foto guardada del sistema de archivos
-       const readFile = await Filesystem.readFile({
-         path: photo.filePath,
-         directory: FilesystemDirectory.Data
-       });
+    // "cuando la plataforma NO sea híbrida, haz esto"
+    if (!this.platform.is('hybrid')) {
 
-       // Solo plataforma web: carga la foto como datos base64
-       photo.webViewPath = `data:image/jpeg;base64,${readFile.data}`;
-     }
-   }
+      // Muestra la foto leyendo en formato base64
+      for (const photo of this.photo) {
+        // Leer los datos de cada foto guardada del sistema de archivos
+        const readFile = await Filesystem.readFile({
+          path: photo.filePath,
+          directory: FilesystemDirectory.Data
+        });
+
+        // Solo plataforma web: carga la foto como datos base64
+        photo.webViewPath = `data:image/jpeg;base64,${readFile.data}`;
+      }
+    }
   }
 
   async addNewToGallery() {
@@ -76,8 +77,27 @@ export class PhotoService {
 
     } catch (error) {
       console.log(error);
-      this.photo = [];
     }
+  }
+
+  public async deletePhoto(photos: Photo, position: number) {
+    // eliminarlo del array
+    this.photo.splice(position, 1);
+
+    // actualizar el array sobreescribiendo la nueva photo array en el storage
+    Storage.set({
+      key: this.PHOTO_MY_GALLERY,
+      value: JSON.stringify(this.photo)
+    });
+
+    // definimos un filename para obtenere acceso y sacar un dato especifico del string webviewPath
+    const fileName = photos.filePath.substr(photos.filePath.lastIndexOf('/') + 1);
+
+    // eliminamos del fileSysten
+    Filesystem.deleteFile({
+      path: fileName,
+      directory: FilesystemDirectory.Data
+    });
   }
 
   private async savedPicture(cameraPhoto: CameraPhoto) {
@@ -91,36 +111,37 @@ export class PhotoService {
       directory: FilesystemDirectory.Data
     });
 
-    if(this.platform.is('hybrid')){
+    if (this.platform.is('hybrid')) {
       return {
-        //mandarle la nueva imagen sobreescrita en el path 'file://' del http
+        // mandarle la nueva imagen sobreescrita en el path 'file://' del http
         filePath: fileSystem.uri,
         webViewPath: Capacitor.convertFileSrc(fileSystem.uri)
-      }
-    }else{
+      };
+    } else {
 
-      //Use webPath para mostrar la nueva imagen en lugar de base64 ya que es
+      // Use webPath para mostrar la nueva imagen en lugar de base64 ya que es
       // ya cargado en la memoria
       return {
         filePath: fileName,
         webViewPath: cameraPhoto.webPath
-      }
+      };
 
     }
 
   }
 
   private async readAsBase64(cameraPhoto: CameraPhoto) {
-    //hybrid lo detectara cordova o capacitor
-    if(this.platform.is('hybrid')){
+    // hybrid lo detectara cordova o capacitor
+    if (this.platform.is('hybrid')) {
 
       const file = await Filesystem.readFile({
         path: cameraPhoto.path
       });
 
       return file.data;
-    }else{
+    } else {
 
+      // tslint:disable-next-line: no-non-null-assertion
       const response = await fetch(cameraPhoto.webPath!);
       const blob = await response.blob();
 
@@ -130,12 +151,12 @@ export class PhotoService {
 
   private convertToBase64(blob: Blob): Promise<any> {
     return new Promise((resolve, reject) => {
-      //FileReader se encarga de formatear el blob a base64
+      // FileReader se encarga de formatear el blob a base64
       const reader = new FileReader();
       reader.onerror = reject;
       reader.onload = () => {
         resolve(reader.result);
-      }
+      };
       reader.readAsDataURL(blob);
     });
   }
